@@ -8,12 +8,32 @@
 // what lives we lead...
 //
 // set info of window/button below
+// edit: now with more buttons, press as many as you want
 //
 
 
-const char *WINDOW_CLASS = "#32770";  // #32770 = dialog window
-const char *WINDOW_TITLE = "Windows Update";
-const char *BUTTON_TEXT = "&Close";
+struct ButtonInfo {
+    char *winClass;
+    char *winTitle;
+    char *buttonText;
+    int msSinceLastPress;
+};
+
+ButtonInfo info[2] =
+{
+    {
+        "#32770",  // #32770 = dialog window
+        "Windows Update",
+        "&Close",
+        0
+    },
+    {
+        "#32770",  // #32770 = dialog window
+        "This is an unregistered copy",
+        "Cancel",
+        0
+    },
+};
 
 
 // turn up to 100 if you want to see the window flash
@@ -166,9 +186,20 @@ int CALLBACK WinMain(
             DispatchMessage(&Message);
         }
 
-        if (CheckForButtonAndPress(WINDOW_CLASS, WINDOW_TITLE, BUTTON_TEXT))
+        for (int i = 0; i < sizeof(info)/sizeof(info[0]); i++)
         {
-            Sleep(1000); // if we press it, wait for a while so we don't spam it
+            if (info[i].msSinceLastPress > 500) // don't spam it
+            {
+                if (CheckForButtonAndPress(info[i].winClass, info[i].winTitle, info[i].buttonText))
+                {
+                    info[i].msSinceLastPress = 0;
+                }
+            }
+            else
+            {
+                // no need to overflow this
+                info[i].msSinceLastPress += POLLING_FREQUENCY_MS;
+            }
         }
 
         Sleep(POLLING_FREQUENCY_MS);
