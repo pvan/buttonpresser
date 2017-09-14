@@ -16,10 +16,10 @@ struct ButtonInfo {
     char *winClass;
     char *winTitle;
     char *buttonText;
-    int msSinceLastPress;
+    int msDelay;
 };
 
-ButtonInfo info[2] =
+static ButtonInfo info[2] =
 {
     {
         "#32770",  // #32770 = dialog window
@@ -101,68 +101,46 @@ HWND CheckForWindow(const char *className, const char *titleStartsWith)
         {
             if (StringBeginsWith(title, titleStartsWith))
             {
+                // MsgBox("Found matching window");
                 return allDialogs[i];
             }
         }
     }
+    // MsgBox("Didn't find window");
     return false;
 }
 
 
 
-static bool globalAlreadySearching = false;
-
-static char globalButtonStartsWith[256];
 
 
+// maybe recursively call findwindowex to avoid this callback?
 BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam)
 {
+    int infoIndex = (int)lParam;
+
     char buttonText[256];
     int resultLength = GetWindowText(hwnd, buttonText, 256);
 
     if (resultLength)
     {
-        if (StringBeginsWith(buttonText, globalButtonStartsWith))
+        if (StringBeginsWith(buttonText, info[infoIndex].buttonText))
         {
             // MsgBox("pressing button");
             SendMessage(hwnd, BM_CLICK, 0, 0);
+
+            // don't check for this one again for a while
+            // so we don't spam the button (probably not really needed)
+            info[infoIndex].msDelay = 500;
+
             return false;
         }
     }
-
-    globalAlreadySearching = true;
 
     return true; // return true to contiue searching
 }
 
 
-
-
-bool CheckForButtonAndPress(
-    const char *className,
-    const char *titleStartsWith,
-    const char *buttonStartsWith)
-{
-    HWND dialog = CheckForWindow(className, titleStartsWith);
-    if (dialog)
-    {
-        // MsgBox("Found matching window");
-
-        if (!globalAlreadySearching)
-        {
-            CopyStrTo(buttonStartsWith, globalButtonStartsWith);
-            EnumChildWindows(dialog, EnumChildProc, 0);
-        }
-
-        // couldn't find button in window
-        return false;
-    }
-    else
-    {
-        //MsgBox("Didn't find window");
-        return false;
-    }
-}
 
 
 int CALLBACK WinMain(
@@ -188,17 +166,17 @@ int CALLBACK WinMain(
 
         for (int i = 0; i < sizeof(info)/sizeof(info[0]); i++)
         {
-            if (info[i].msSinceLastPress > 500) // don't spam it
+            if (info[i].msDelay <= 0)
             {
-                if (CheckForButtonAndPress(info[i].winClass, info[i].winTitle, info[i].buttonText))
+                HWND dialogBox = CheckForWindow(info[i].winClass, info[i].winTitle);
+                if (dialogBox)
                 {
-                    info[i].msSinceLastPress = 0;
+                    EnumChildWindows(dialogBox, EnumChildProc, i);
                 }
             }
             else
             {
-                // no need to overflow this
-                info[i].msSinceLastPress += POLLING_FREQUENCY_MS;
+                info[i].msDelay -= POLLING_FREQUENCY_MS;
             }
         }
 
